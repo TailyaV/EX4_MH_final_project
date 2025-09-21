@@ -1,0 +1,101 @@
+        -:    0:Source:main.cpp
+        -:    1:#include "graph.hpp"
+        -:    2:#include <iostream>
+        -:    3:#include <unistd.h>
+        -:    4:#include <vector>
+        -:    5:#include <algorithm>
+        -:    6:#include "main.hpp"
+        -:    7:using namespace std;
+        -:    8:
+        -:    9:extern char *optarg;   //holds the option argument
+        -:   10:extern int optopt;
+        -:   11:
+        -:   12:// Helper to print a circuit
+        1:   13:void printCircuit(const vector<int>& circuit) {
+        5:   14:    for (int v : circuit) {
+        4:   15:        cout << v << " ";
+        -:   16:    }
+        1:   17:    cout << endl;
+        1:   18:}
+        -:   19:
+        3:   20:Graph buildRandGraph(int numOfEdges, int numOfVartx, int seed){
+        -:   21:    // Compute the maximum number of edges in a simple undirected graph with V vertices
+        3:   22:    int allEdgesNum = numOfVartx*(numOfVartx - 1)/2;
+        -:   23:    // Validate that requested number of edges does not exceed the maximum possible
+        3:   24:    if(numOfEdges > allEdgesNum){
+        1:   25:        throw invalid_argument("Graph with" + to_string(numOfVartx) + " vatexes cant have " + to_string(numOfEdges) + "edgaes.\n");
+        -:   26:    }
+        2:   27:    srand(seed);
+        -:   28:    // Create an undirected graph
+        2:   29:    Graph graph(numOfVartx, false);
+        -:   30:
+        2:   31:    vector<pair<int, int>> allAdges;
+        2:   32:    vector<int> chosen;
+        -:   33:    // Build the list of all possible undirected edges
+       10:   34:    for (int u = 0; u < numOfVartx; u++) {
+       20:   35:        for (int v = u + 1; v < numOfVartx; v++) {
+       12:   36:            allAdges.push_back({u, v});
+        -:   37:        }
+        -:   38:    }
+        -:   39:    // Randomly choose 'numOfEdges' distinct edges
+       12:   40:    for(int i = 0; i < numOfEdges; i++){
+       10:   41:        int randNum = rand() % allEdgesNum;
+        -:   42:        // If this index was already used, keep drawing until a new one is found
+       24:   43:        while(find(chosen.begin(), chosen.end(), randNum) != chosen.end()){
+       14:   44:            randNum = rand() % allEdgesNum;
+        -:   45:        }
+        -:   46:            // Add the corresponding edge to the graph
+       10:   47:            graph.addEdge(allAdges[randNum].first, allAdges[randNum].second);
+        -:   48:            // Mark the index as used
+       10:   49:            chosen.push_back(randNum);
+        -:   50:        
+        -:   51:    }
+        4:   52:    return graph;
+        2:   53:}
+        -:   54:
+        -:   55:#ifndef UNIT_TESTING
+        -:   56:int main(int argc, char* argv[]) {
+        -:   57:    //Usage check: expects -e <edges> -v <vertices> -s <seed>
+        -:   58:    if(argc < 7){
+        -:   59:        cout << "Please enter 'program name' -e <numberOfEdges> -v <numberOfVertax> -s <seed>" << endl;
+        -:   60:        return 1;
+        -:   61:    }
+        -:   62:    int numOfEdges = 0;
+        -:   63:    int numOfVartx = 0;
+        -:   64:    int seed;
+        -:   65:    int ret;
+        -:   66:
+        -:   67:    //Get the arguments from the user and cheack correctness
+        -:   68:    while((ret = getopt(argc, argv, ":e:v:s:")) != -1){
+        -:   69:        switch(ret){
+        -:   70:            //Unknown option
+        -:   71:            case '?':
+        -:   72:                std::cout << static_cast<char>(optopt) << " is unknown option" << std::endl;
+        -:   73:            //No value provided to option
+        -:   74:            case ':':
+        -:   75:                std::cout << "No value provided to option " << static_cast<char>(optopt) << std::endl;
+        -:   76:            case 'e':
+        -:   77:                try{numOfEdges = stoi(optarg);
+        -:   78:                }catch(const std::invalid_argument&){printf("invalid argument, write number(int) of edges\n"); return 1; }
+        -:   79:            case 'v':
+        -:   80:                try{numOfVartx = stoi(optarg);
+        -:   81:                }catch(const std::invalid_argument&){printf("invalid argument, write number(int) of vartexes\n"); return 1; }
+        -:   82:            case 's':
+        -:   83:                 try{seed = stoi(optarg);
+        -:   84:                }catch(const std::invalid_argument&){printf("invalid argument, write number(int) for seed\n"); return 1; }
+        -:   85:        }
+        -:   86:    }
+        -:   87:    Graph graph = buildRandGraph(numOfEdges, numOfVartx, seed); 
+        -:   88:    // Print the graph
+        -:   89:    graph.printGraph();
+        -:   90:    // Check if the graph has an Euler circuit; if so, compute and print it
+        -:   91:    if (graph.hasEulerCircuit()) {
+        -:   92:        cout << "Euler Circuit exists. Path:\n";
+        -:   93:        printCircuit(graph.findEulerCircuit());
+        -:   94:    } else {
+        -:   95:        cout << "No Euler Circuit.\n";
+        -:   96:    }
+        -:   97:    
+        -:   98:    return 0;
+        -:   99:}
+        -:  100:#endif

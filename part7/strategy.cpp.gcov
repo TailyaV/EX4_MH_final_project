@@ -1,0 +1,29 @@
+        -:    0:Source:strategy.cpp
+        -:    0:Graph:strategy.gcno
+        -:    0:Data:strategy.gcda
+        -:    0:Runs:1
+        -:    1:#include "strategy.hpp"
+        -:    2:#include <iostream>
+        -:    3:
+        1:    4:void MSTStrategy::execute(Graph& graph) const {
+        1:    5:    std::cout << "MST Weight: " << graph.mstWeight() << std::endl;
+        1:    6:}
+        -:    7:
+        1:    8:void CliqueStrategy::execute(Graph& graph) const {
+        1:    9:    std::cout << "Total Cliques: " << graph.countCliques() << std::endl;
+        1:   10:}
+        -:   11:
+        1:   12:void SCCStrategy::execute(Graph& graph) const {
+        1:   13:    std::cout << "Strongly Connected Components:\n";
+        1:   14:    auto sccs = graph.findSCCs();
+        2:   15:    for (const auto& component : sccs) {
+        6:   16:        for (int v : component)
+        5:   17:            std::cout << v << " ";
+        1:   18:        std::cout << "\n";
+        -:   19:    }
+        1:   20:}
+        -:   21:
+        1:   22:void MaxFlowStrategy::execute(Graph& graph) const {
+        1:   23:    int maxFlowValue = graph.maxFlow(0, graph.getNumVertices() - 1);
+        1:   24:    std::cout << "Max Flow from 0 to " << graph.getNumVertices()-1 << ": " << maxFlowValue << std::endl;
+        1:   25:}

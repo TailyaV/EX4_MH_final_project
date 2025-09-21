@@ -1,0 +1,40 @@
+#make
+#./euler_test
+
+#Compiler and flags
+CXX = g++
+CXXFLAGS = -Wall -std=c++17 -fprofile-arcs -ftest-coverage
+LDFLAGS = -lgcov
+
+#Target and object files
+TARGET = euler_test
+OBJS = main.o graph.o
+
+# Build target
+$(TARGET): $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJS) $(LDFLAGS)
+
+#Compile source files
+main.o: main.cpp graph.hpp
+	$(CXX) $(CXXFLAGS) -c main.cpp -o main.o
+
+graph.o: graph.cpp graph.hpp
+	$(CXX) $(CXXFLAGS) -c graph.cpp -o graph.o
+
+#Clean
+clean:
+	del /Q *.o *.exe *.gcda *.gcno *.gcov 2>nul || rm -f *.o *.exe *.gcda *.gcno *.gcov $(TARGET)
+
+#Run the program
+run: $(TARGET)
+	./$(TARGET)
+
+#Run Valgrind
+valgrind: $(TARGET)
+	valgrind --leak-check=full ./$(TARGET)
+
+#Generate coverage report
+coverage: clean $(TARGET)
+	./$(TARGET)
+	gcov graph.cpp
+	gcov main.cpp

@@ -1,0 +1,142 @@
+        -:    0:Source:server.cpp
+        -:    1:#include "pipling.hpp"
+        -:    2:#include "graph.hpp"
+        -:    3:#include <iostream>
+        -:    4:#include <sstream>
+        -:    5:#include <unistd.h>
+        -:    6:#include <netinet/in.h>
+        -:    7:
+        -:    8://Function for print all the results of 4 algorithms
+        5:    9:std::string to_string(Pipling::Result res){
+        5:   10:    std::ostringstream out;
+        5:   11:    out << "\nMST weight:\n" << res.mst_weight << std::endl;
+        5:   12:    out << "number of cliques:\n" << res.num_cliques << std::endl;
+        5:   13:    out << "Strongly Connected Components:\n";
+        5:   14:    auto sccs = res.sccs;
+       20:   15:    for (const auto& component : sccs) {
+       31:   16:        for (int v : component)
+       16:   17:            out << v << " ";
+       15:   18:        out << "\n";
+        -:   19:    }
+        5:   20:    out << "max flow:\n" << res.max_flow;
+        -:   21:
+        5:   22:    out << "}";
+       10:   23:    return out.str();
+        5:   24:}
+        -:   25:
+        -:   26://Function for reading all n byts precisely
+       30:   27:static bool read_exact(int fd, void* buf, size_t n) {
+       30:   28:    char* p = (char*)buf; size_t left = n;
+       61:   29:    while (left) {
+       31:   30:        ssize_t r = ::read(fd, p, left);
+      31*:   31:        if (r == 0) return false;            //close client
+      31*:   32:        if (r < 0) { if (errno == EINTR) continue; return false; }
+       30:   33:        p += r; left -= (size_t)r;
+        -:   34:    }
+       30:   35:    return true;
+        -:   36:}
+        -:   37:
+        -:   38://Function for writting all n byts precisely
+        4:   39:static bool write_all(int fd, const void* buf, size_t n) {
+        4:   40:    const char* p = static_cast<const char*>(buf);
+        4:   41:    size_t left = n;
+        7:   42:    while (left) {
+        4:   43:        ssize_t w = ::write(fd, p, left);
+       4*:   44:        if (w < 0) { if (errno == EINTR) continue; return false; }
+        3:   45:        p += w;
+        3:   46:        left -= (size_t)w;
+        -:   47:    }
+        3:   48:    return true;
+        -:   49:}
+        -:   50:
+        -:   51://Callbeck function for lf, get the client massage and sand back answer
+        6:   52:bool my_handler(int new_socket) {
+        6:   53:    int choice = 0;
+       6*:   54:        if (!read_exact(new_socket, &choice, sizeof(int))) return false;
+        -:   55:
+        6:   56:        Graph g(0, true);
+        -:   57:
+        6:   58:        if (choice == 1) { // GRAPH
+        -:   59:            int vertices;
+       3*:   60:            if (!read_exact(new_socket, &vertices, sizeof(int))) return false;
+        3:   61:            g = Graph(vertices, true);
+        -:   62:
+        -:   63:            int u, v;
+        -:   64:            while (true) {
+       9*:   65:                if (!read_exact(new_socket, &u, sizeof(int))) return false;
+       9*:   66:                if (!read_exact(new_socket, &v, sizeof(int))) return false;
+        9:   67:                if (u == -1 && v == -1) break;
+        6:   68:                g.addEdge(u, v);
+        -:   69:            }
+        3:   70:        } else if (choice == 2) { // RANDOM GRAPH
+        -:   71:            int vertices, edges, seed;
+       1*:   72:            if (!read_exact(new_socket, &vertices, sizeof(int))) return false;
+       1*:   73:            if (!read_exact(new_socket, &edges, sizeof(int)))   return false;
+       1*:   74:            if (!read_exact(new_socket, &seed, sizeof(int)))    return false;
+        1:   75:            g = Graph::buildRandGraph(edges, vertices, seed);
+        2:   76:        }else if(choice == 0){
+        1:   77:            return false;
+        -:   78:        }else{
+        1:   79:            throw std::invalid_argument("error: Unknown command");
+        -:   80:        }
+        -:   81:        //Create instance of Pipling
+        4:   82:        Pipling pipling;
+        -:   83:        //Create threds on start function
+        4:   84:        pipling.start();
+        4:   85:        pipling.submit(g);
+        4:   86:        Pipling::Result res = pipling.get();
+        4:   87:        pipling.stop();
+        4:   88:        std::string out = to_string(res);
+        4:   89:        std::cout << "Sending graph algorithms results..." << std::endl;
+        -:   90:        //Send algorithms result to client 
+        4:   91:        write_all(new_socket, out.c_str(), out.size());
+        4:   92:        return true;
+        -:   93:        
+        6:   94:}
+        -:   95:
+        1:   96:int bind_listen(int port) {
+        1:   97:    int fd = ::socket(AF_INET, SOCK_STREAM, 0);
+       1*:   98:    if (fd < 0) throw std::system_error(errno, std::generic_category(), "socket");
+        -:   99:
+        1:  100:    int yes = 1;
+        -:  101:    //Allows both reuse after closing, and opening multiple sockets simultaneously on the same port.
+        1:  102:    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &yes, sizeof(yes));
+        -:  103:
+        1:  104:    sockaddr_in a{};
+        1:  105:    a.sin_family      = AF_INET;
+        1:  106:    a.sin_addr.s_addr = htonl(INADDR_ANY);
+        1:  107:    a.sin_port        = htons((uint16_t)port);
+        1:  108:    size_t alen = sizeof(a);
+        1:  109:    if (bind(fd, (sockaddr*)&a, sizeof(a)) < 0) {
+    #####:  110:        int e = errno; close(fd);
+    #####:  111:        throw std::system_error(e, std::generic_category(), "bind");
+        -:  112:    }
+        1:  113:    if (listen(fd, SOMAXCONN) < 0) {
+    #####:  114:        int e = errno; ::close(fd);
+    #####:  115:        throw std::system_error(e, std::generic_category(), "listen");
+        -:  116:    }
+        1:  117:     int new_socket = accept(fd, (struct sockaddr*)&a, (socklen_t*)&alen);
+        1:  118:    return new_socket;
+        -:  119:}
+        -:  120:
+        -:  121:#ifndef UNIT_TEST
+        -:  122:int main() {
+        -:  123:    const int PORT = 8080;
+        -:  124:    
+        -:  125:    //Creates an instance of lf server
+        -:  126:    std::cout << "Server listening on port " << PORT << "...\n"
+        -:  127:              << "Press ENTER to stop.\n";
+        -:  128:    int fd = bind_listen(PORT);
+        -:  129:    //get request from client and send back respond
+        -:  130:    while(true){
+        -:  131:        if(!my_handler(fd)){
+        -:  132:            break;
+        -:  133:        }
+        -:  134:    }
+        -:  135:    std::cout << "Stopped.\n";
+        -:  136:    //Close connection
+        -:  137:    shutdown(fd, SHUT_WR);
+        -:  138:    close(fd);
+        -:  139:    return 0;
+        -:  140:}
+        -:  141:#endif

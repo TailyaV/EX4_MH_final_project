@@ -1,0 +1,70 @@
+        -:    0:Source:euler_client.cpp
+        -:    0:Graph:euler_client.gcno
+        -:    0:Data:euler_client.gcda
+        -:    0:Runs:3
+        -:    1:#include <iostream>
+        -:    2:#include <sstream>
+        -:    3:#include <string>
+        -:    4:#include <vector>
+        -:    5:#include <cstring>
+        -:    6:#include <unistd.h>
+        -:    7:#include <arpa/inet.h>
+        -:    8:
+        -:    9:#define PORT 8080
+        -:   10:#define BUFFER_SIZE 4096
+        -:   11:
+        -:   12:using namespace std;
+        -:   13:
+        3:   14:int main() {
+        3:   15:    int sock = 0;
+        -:   16:    struct sockaddr_in serv_addr;
+        3:   17:    char buffer[BUFFER_SIZE] = {0};
+        -:   18:
+        -:   19:    //Create socket
+        3:   20:    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+    #####:   21:        perror("Socket creation error");
+    #####:   22:        return 1;
+        -:   23:    }
+        -:   24:
+        3:   25:    serv_addr.sin_family = AF_INET;
+        3:   26:    serv_addr.sin_port = htons(PORT);
+        -:   27:
+        -:   28:    //Convert IPv4 address from text to binary
+        3:   29:    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
+    #####:   30:        perror("Invalid address / Address not supported");
+    #####:   31:        return 1;
+        -:   32:    }
+        -:   33:
+        -:   34:    //Connect to server
+        3:   35:    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        2:   36:        perror("Connection Failed");
+        2:   37:        return 1;
+        -:   38:    }
+        -:   39:
+        -:   40:    //input of user
+        1:   41:    cout << "Enter number of vertices:" << endl;
+        1:   42:    string input;
+        1:   43:    getline(cin, input);
+        1:   44:    stringstream graph_data;
+        1:   45:    graph_data << input << "\n";
+        -:   46:
+        1:   47:    cout << "Now enter the edges (u v), one per line. Type 'end' to finish:\n";
+        -:   48:    while (true) {
+        5:   49:        getline(cin, input);
+        5:   50:        if (input == "end") break;
+        4:   51:        graph_data << input << "\n";
+        -:   52:    }
+        -:   53:
+        1:   54:    string data_to_send = graph_data.str();
+        -:   55:
+        -:   56:    //Send the graph data to the server
+        1:   57:    send(sock, data_to_send.c_str(), data_to_send.size(), 0);
+        -:   58:
+        -:   59:    // Read the response
+        1:   60:    read(sock, buffer, BUFFER_SIZE);
+        1:   61:    cout << "Server response: " << buffer << endl;
+        -:   62:
+        -:   63:    //Close the socket
+        1:   64:    close(sock);
+        1:   65:    return 0;
+        1:   66:}

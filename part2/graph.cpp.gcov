@@ -1,0 +1,146 @@
+        -:    0:Source:graph.cpp
+        -:    0:Graph:graph.gcno
+        -:    0:Data:graph.gcda
+        -:    0:Runs:1
+        -:    1:#include "graph.hpp"           
+        -:    2:#include <iostream>       
+        -:    3:#include <algorithm>   
+        -:    4:#include <stack>
+        -:    5:
+        -:    6:// Constructor for the Graph class
+        4:    7:Graph::Graph(int vertices, bool directed) 
+        4:    8:    : numVertices(vertices),  
+        4:    9:      directed(directed),        
+        4:   10:      adjList(vertices) {}       
+        -:   11:
+        -:   12:// Function to add an edge between two vertices u and v
+       16:   13:void Graph::addEdge(int u, int v) {
+       16:   14:    if (u < 0 || u >= numVertices || v < 0 || v >= numVertices) {  // Check if u and v are valid indices
+        2:   15:        std::cout << "Error: Invalid vertex index." << std::endl;  // Print error if they are out of range
+        2:   16:        return;                                                   
+        -:   17:    }
+       14:   18:    adjList[u].push_back(v); // Add v to u's adjacency list
+       14:   19:    if (!directed) { // If the graph is undirected
+       14:   20:        adjList[v].push_back(u);// Add u to v's adjacency list as well
+        -:   21:    }
+        -:   22:}
+        -:   23:
+        -:   24:// Function to remove an edge between two vertices u and v
+        2:   25:void Graph::removeEdge(int u, int v) {
+        2:   26:    if (u < 0 || u >= numVertices || v < 0 || v >= numVertices) {  // Check if u and v are valid indices
+        1:   27:        std::cout << "Error: Invalid vertex index." << std::endl;  
+        1:   28:        return;                                                
+        -:   29:    }
+        1:   30:    auto& neighborsU = adjList[u]; // Reference to u's adjacency list
+        2:   31:    neighborsU.erase(                                              
+        1:   32:        std::remove(neighborsU.begin(), neighborsU.end(), v), // Find v in u's list and move it to the end
+        1:   33:        neighborsU.end() // Erase the found element(s)
+        -:   34:    );
+        1:   35:    if (!directed) {  // If the graph is undirected
+        1:   36:        auto& neighborsV = adjList[v]; // Reference to v's adjacency list
+        2:   37:        neighborsV.erase(                                          
+        1:   38:            std::remove(neighborsV.begin(), neighborsV.end(), u),  // Find u in v's list and move it to the end
+        2:   39:            neighborsV.end() // Erase the found element(s)
+        -:   40:        );
+        -:   41:    }
+        -:   42:}
+        -:   43:
+        -:   44:// Function to print the adjacency list of the graph
+        3:   45:void Graph::printGraph() const {
+       15:   46:    for (int i = 0; i < numVertices; i++) {       
+       12:   47:        std::cout << i << ": "; // Print the current vertex index
+       38:   48:        for (int neighbor : adjList[i]) {         
+       26:   49:            std::cout << neighbor << " "; // Print each neighbor
+        -:   50:        }
+       12:   51:        std::cout << std::endl; // Move to a new line after printing all neighbors
+        -:   52:    }
+        3:   53:}
+        -:   54:
+        -:   55:// Function to get the list of neighbors for vertex v
+        1:   56:const std::vector<int>& Graph::getNeighbors(int v) const {
+        1:   57:    return adjList[v];         
+        -:   58:}
+        -:   59:
+        -:   60:// Function to get the total number of vertices in the graph
+        1:   61:int Graph::getNumVertices() const {
+        1:   62:    return numVertices;                        
+        -:   63:}
+        -:   64:
+        -:   65:// Depth-First Search helper function to mark all reachable vertices
+       17:   66:void Graph::dfs(int v, vector<bool>& visited, const vector<vector<int>>& localAdjList) const {
+       17:   67:    visited[v] = true; // Mark the current vertex as visited
+        -:   68:
+        -:   69:    // Loop over all neighbors of vertex v
+       55:   70:    for (int neighbor : localAdjList[v]) {
+        -:   71:        // If the neighbor hasn't been visited yet, visit it recursively
+       38:   72:        if (!visited[neighbor]) {
+       13:   73:            dfs(neighbor, visited, localAdjList);
+        -:   74:        }
+        -:   75:    }
+       17:   76:}
+        -:   77:
+        -:   78:// Checks whether the graph contains an Euler circuit
+        4:   79:bool Graph::hasEulerCircuit() const {
+        4:   80:    vector<bool> visited(numVertices, false);// Create a visited array initialized to false
+        4:   81:    int start = -1;
+        -:   82:
+        -:   83:    // Find a vertex with at least one edge to start the DFS from
+       4*:   84:    for (int i = 0; i < numVertices; ++i) {
+        4:   85:        if (!adjList[i].empty()) { // This vertex has neighbors
+        4:   86:            start = i;
+        4:   87:            break;
+        -:   88:        }
+        -:   89:    }
+        -:   90:    // If no vertex has any edges, the graph is empty (no edges), which is a trivial Euler circuit
+       4*:   91:    if (start == -1) return true; // No edges
+        -:   92:
+        -:   93:    // Perform DFS to check if all non-isolated vertices are reachable (i.e., graph is connected)
+        4:   94:    dfs(start, visited, adjList);
+        -:   95:
+        -:   96:    // Ensure all vertices that have edges are visited
+       21:   97:    for (int i = 0; i < numVertices; ++i) {
+      17*:   98:        if (!adjList[i].empty() && !visited[i]) return false;// Graph is not connected
+        -:   99:    }
+        -:  100:
+        -:  101:    // Check that all vertices have even degree
+       14:  102:    for (const auto& neighbors : adjList) {
+       12:  103:        if (neighbors.size() % 2 != 0) return false;// Vertex has odd degree =no Euler circuit
+        -:  104:
+        -:  105:    }
+        2:  106:    return true;
+        4:  107:}
+        -:  108:
+        -:  109:// Finds and returns an Euler circuit starting from the given vertex
+        1:  110:vector<int> Graph::findEulerCircuit(int start) {
+        1:  111:    vector<int> circuit;
+        -:  112:
+        -:  113:    // If the graph does not have an Euler circuit, return an empty vector
+       1*:  114:    if (!hasEulerCircuit()) return circuit;
+        -:  115:
+        1:  116:    vector<vector<int>> tempAdj = adjList;// Make a temporary copy of the adjacency list to modify
+        1:  117:    stack<int> path;// Stack to track the current path in the traversal
+        1:  118:    vector<int> result;// To store the final Euler circuit in reverse
+        -:  119:
+        1:  120:    path.push(start);// Begin traversal at the starting vertex
+        -:  121:
+       14:  122:    while (!path.empty()) {
+       13:  123:        int v = path.top();// Look at the current vertex on top of the stack
+       13:  124:        if (!tempAdj[v].empty()) {
+        -:  125:            // While there are unused edges from v, go deeper
+        6:  126:            int u = tempAdj[v].back();// Choose the last neighbor
+        6:  127:            tempAdj[v].pop_back(); // Remove edge vu from v’s list
+        6:  128:            if (!directed) {
+        -:  129:                // For undirected graph, also remove the edge u → v from u's list
+        6:  130:                auto& vec = tempAdj[u];
+        6:  131:                vec.erase(remove(vec.begin(), vec.end(), v), vec.end());
+        -:  132:            }
+        6:  133:            path.push(u);// Continue to the neighbor u
+        -:  134:        } else {
+        -:  135:            // No more edges left from v → backtrack
+        7:  136:            result.push_back(v);// Add v to the result
+        7:  137:            path.pop();// Go back to previous vertex
+        -:  138:        }
+        -:  139:    }
+        1:  140:    reverse(result.begin(), result.end());// Reverse the result to get correct path order
+        1:  141:    return result;// Return the final Euler circuit
+        1:  142:}

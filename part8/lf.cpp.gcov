@@ -1,0 +1,116 @@
+        -:    0:Source:lf.cpp
+        -:    1:#include "lf.hpp"
+        -:    2:#include <iostream>
+        -:    3:#include <system_error>
+        -:    4:#include <arpa/inet.h>
+        -:    5:#include <netinet/in.h>
+        -:    6:#include <sys/socket.h>
+        -:    7:#include <unistd.h>
+        -:    8:
+        -:    9://Constractor for lf with port, number of threads and function
+        5:   10:LFServer::LFServer(int port, int threads, Handler h)
+        5:   11:    : port(port), threads(threads), function(std::move(h)) {}
+        -:   12:
+        -:   13://Close socket if needed
+        5:   14:LFServer::~LFServer() {
+        5:   15:    int fd = -1;
+        5:   16:    { std::lock_guard<std::mutex> lk(m_); fd = listen_fd_; listen_fd_ = -1; }
+        5:   17:    if (fd != -1) ::close(fd);
+        5:   18:}
+        -:   19:
+        -:   20://Open a TCP socket and return file discreptor
+        4:   21:int LFServer::bind_listen() {
+        4:   22:    int fd = ::socket(AF_INET, SOCK_STREAM, 0);
+       4*:   23:    if (fd < 0) throw std::system_error(errno, std::generic_category(), "socket");
+        -:   24:
+        4:   25:    int yes = 1;
+        -:   26:    //Allows both reuse after closing, and opening multiple sockets simultaneously on the same port.
+        4:   27:    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &yes, sizeof(yes));
+        -:   28:
+        4:   29:    sockaddr_in a{};
+        4:   30:    a.sin_family      = AF_INET;
+        4:   31:    a.sin_addr.s_addr = htonl(INADDR_ANY);
+        4:   32:    a.sin_port        = htons((uint16_t)port);
+        -:   33:
+        4:   34:    if (bind(fd, (sockaddr*)&a, sizeof(a)) < 0) {
+    #####:   35:        int e = errno; close(fd);
+    #####:   36:        throw std::system_error(e, std::generic_category(), "bind");
+        -:   37:    }
+        4:   38:    if (listen(fd, SOMAXCONN) < 0) {
+    #####:   39:        int e = errno; ::close(fd);
+    #####:   40:        throw std::system_error(e, std::generic_category(), "listen");
+        -:   41:    }
+        4:   42:    return fd;
+        -:   43:}
+        -:   44:
+        -:   45://Runs the server until stopped
+        4:   46:void LFServer::start() {
+        -:   47:    //open tcp socket
+        4:   48:    listen_fd_ = bind_listen();
+        -:   49:    //Updating the flag under lockdown for true
+        4:   50:    { std::lock_guard<std::mutex> lk(m_); leader_free_ = true; }
+        -:   51:    //Create threads and run worker loop for each 
+        4:   52:    std::vector<std::thread> pool;
+        4:   53:    pool.reserve(threads);
+       13:   54:    for (int i = 0; i < threads; ++i)
+       18:   55:        pool.emplace_back([this]{ worker_loop(); });
+        -:   56:
+       13:   57:    for (auto& t : pool) t.join();
+        4:   58:}
+        -:   59:
+        -:   60://Stop all threads saftly by indicats leader_free_ true.
+        5:   61:void LFServer::request_stop() {
+        5:   62:    stopping_.store(true, std::memory_order_relaxed);
+        5:   63:    int fd = -1;
+        -:   64:    {
+        5:   65:        std::lock_guard<std::mutex> lk(m_);
+        5:   66:        fd = listen_fd_; //safe read
+        5:   67:        leader_free_ = true;
+        5:   68:        cv_.notify_all();          
+        5:   69:    }
+        5:   70:    if (fd != -1) ::shutdown(fd, SHUT_RDWR);
+        5:   71:}
+        -:   72:
+        -:   73://Choose leader
+       16:   74:void LFServer::become_leader_blocking() {
+       16:   75:    std::unique_lock<std::mutex> lk(m_);
+        -:   76:    //wait for leader_free_ to be true
+       41:   77:    cv_.wait(lk, [&]{ return leader_free_ || stopping_.load(); });
+       16:   78:    if (stopping_.load()) return;
+       11:   79:    leader_free_ = false; //defines a leader
+       16:   80:}
+        -:   81:
+        -:   82://Transfers leadership to the next thread.
+       11:   83:void LFServer::promote_new_leader() {
+       11:   84:    std::lock_guard<std::mutex> lk(m_);
+       11:   85:    leader_free_ = true;
+       11:   86:    cv_.notify_one();
+       11:   87:}
+        -:   88:
+        -:   89://Runs the handler that provided on the client's fd, then closes the connection.
+        7:   90:void LFServer::handle_one(int cfd) {
+        7:   91:    try { function(cfd); }
+        1:   92:    catch (const std::exception& e) { std::cerr << "handler error: " << e.what() << "\n"; }
+        7:   93:    close(cfd);
+        7:   94:}
+        -:   95:
+        -:   96://Main function of lf: make current thread to a leader, wait for client connection, transfers leadership to the next thread, and handle the connection.
+        9:   97:void LFServer::worker_loop() {
+       16:   98:    while (!stopping_.load()) {
+       16:   99:        become_leader_blocking();
+       16:  100:        if (stopping_.load()) break;
+        -:  101:
+       11:  102:        int cfd = accept(listen_fd_, nullptr, nullptr);
+        -:  103:
+        -:  104:        // transfers leadership to the next thread
+       11:  105:        promote_new_leader();
+        -:  106:
+      11*:  107:        if (cfd < 0) {
+        4:  108:            if (stopping_.load()) break;
+    #####:  109:            if (errno == EINTR || errno == EAGAIN) continue;
+    #####:  110:            std::perror("accept");
+    #####:  111:            continue;
+        -:  112:        }
+        7:  113:        handle_one(cfd);
+        -:  114:    }
+        9:  115:}

@@ -1,0 +1,97 @@
+        -:    0:Source:main.cpp
+        -:    0:Graph:main.gcno
+        -:    0:Data:main.gcda
+        -:    0:Runs:1
+        -:    1:#include "graph.hpp"
+        -:    2:#include <iostream>
+        -:    3:using namespace std;
+        -:    4:
+        -:    5://Helper to print a circuit
+        1:    6:void printCircuit(const vector<int>& circuit) {
+        8:    7:    for (int v : circuit) {
+        7:    8:        cout << v << " ";
+        -:    9:    }
+        1:   10:    cout << endl;
+        1:   11:}
+        -:   12:
+        1:   13:int main() {
+        -:   14:    // Graph with Euler Circuit
+        1:   15:    cout << "Test 1: Graph with Euler Circuit\n";
+        1:   16:    Graph g1(5, false);
+        1:   17:    g1.addEdge(0, 1);
+        1:   18:    g1.addEdge(1, 2);
+        1:   19:    g1.addEdge(2, 0);
+        1:   20:    g1.addEdge(0, 3);
+        1:   21:    g1.addEdge(3, 4);
+        1:   22:    g1.addEdge(4, 0);
+        -:   23:
+        1:   24:    g1.printGraph();
+        -:   25:
+        1:   26:    if (g1.hasEulerCircuit()) {
+        1:   27:        cout << "Euler Circuit exists. Path:\n";
+        1:   28:        printCircuit(g1.findEulerCircuit());
+        -:   29:    } else {
+    #####:   30:        cout << "No Euler Circuit.\n";
+        -:   31:    }
+        -:   32:
+        1:   33:    cout << "\n";
+        -:   34:
+        -:   35:    //Euler Path, not a Circuit
+        1:   36:    cout << "Test 2: Euler Path (not a circuit)\n";
+        1:   37:    Graph g2(4, false);
+        1:   38:    g2.addEdge(0, 1);
+        1:   39:    g2.addEdge(1, 2);
+        1:   40:    g2.addEdge(2, 3);
+        -:   41:
+        1:   42:    g2.printGraph();
+        -:   43:
+        1:   44:    if (g2.hasEulerCircuit()) {
+    #####:   45:        cout << "Euler Circuit exists. Path:\n";
+    #####:   46:        printCircuit(g2.findEulerCircuit());
+        -:   47:    } else {
+        1:   48:        cout << "No Euler Circuit (but this graph has an Euler path).\n";
+        -:   49:    }
+        -:   50:
+        1:   51:    cout << "\n";
+        -:   52:
+        -:   53:    //Neither Euler Path nor Circuit
+        1:   54:    cout << "Test 3: Neither Euler Path nor Circuit\n";
+        1:   55:    Graph g3(3, false);
+        1:   56:    g3.addEdge(0, 1);
+        1:   57:    g3.addEdge(1, 2);
+        1:   58:    g3.addEdge(2, 0);
+        1:   59:    g3.addEdge(0, 1); //extra edge → odd degree
+        -:   60:
+        1:   61:    g3.printGraph();
+        -:   62:
+        1:   63:    if (g3.hasEulerCircuit()) {
+    #####:   64:        cout << "Euler Circuit exists. Path:\n";
+    #####:   65:        printCircuit(g3.findEulerCircuit());
+        -:   66:    } else {
+        1:   67:        cout << "No Euler Circuit or Path.\n";
+        -:   68:    }
+        -:   69:
+        1:   70:    cout << "\n";
+        -:   71:
+        -:   72:    //Test edge cases for full coverage
+        1:   73:    cout << "Test 4: Invalid Inputs and Removals \n";
+        1:   74:    Graph g4(3, false);
+        -:   75:
+        -:   76:    //Try invalid addEdge (out-of-bounds indices)
+        1:   77:    g4.addEdge(-1, 2);   //should print error
+        1:   78:    g4.addEdge(2, 3);    //should print error
+        -:   79:
+        -:   80:    //Add and remove edges properly
+        1:   81:    g4.addEdge(0, 1);
+        1:   82:    g4.removeEdge(0, 1); //remove valid
+        1:   83:    g4.removeEdge(2, 3); //invalid remove
+        -:   84:
+        -:   85:    //Use getters
+        1:   86:    cout << "Vertices count: " << g4.getNumVertices() << endl;
+        1:   87:    const auto& neighbors = g4.getNeighbors(0);
+        1:   88:    cout << "Neighbors of 0: ";
+       1*:   89:    for (int n : neighbors) cout << n << " ";
+        1:   90:    cout << endl;
+        -:   91:
+        1:   92:    return 0;
+        1:   93:}

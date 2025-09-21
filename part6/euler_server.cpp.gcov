@@ -1,0 +1,95 @@
+        -:    0:Source:euler_server.cpp
+        -:    0:Graph:euler_server.gcno
+        -:    0:Data:euler_server.gcda
+        -:    0:Runs:2
+        -:    1:#include <iostream>
+        -:    2:#include <cstring>
+        -:    3:#include <unistd.h>
+        -:    4:#include <arpa/inet.h>
+        -:    5:#include <sstream>
+        -:    6:#include "graph.hpp"
+        -:    7:
+        -:    8:#define PORT 8080
+        -:    9:#define BUFFER_SIZE 4096
+        -:   10:
+        -:   11:using namespace std;
+        -:   12:
+        2:   13:int main() {
+        -:   14:    int server_fd, client_fd;
+        -:   15:    struct sockaddr_in server_addr, client_addr;
+        2:   16:    socklen_t addr_len = sizeof(client_addr);
+        2:   17:    char buffer[BUFFER_SIZE] = {0};
+        -:   18:
+        -:   19:    // Create socket
+        2:   20:    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+        2:   21:    if (server_fd == 0) {
+    #####:   22:        perror("Socket failed");
+    #####:   23:        exit(EXIT_FAILURE);
+        -:   24:    }
+        -:   25:
+        -:   26:    // Set up address structure
+        2:   27:    server_addr.sin_family = AF_INET;
+        2:   28:    server_addr.sin_addr.s_addr = INADDR_ANY; // Accept connections from any IP
+        2:   29:    server_addr.sin_port = htons(PORT);       // Convert to network byte order
+        -:   30:
+        -:   31:    // Bind the socket
+        2:   32:    if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        1:   33:        perror("Bind failed");
+        1:   34:        exit(EXIT_FAILURE);
+        -:   35:    }
+        -:   36:
+        -:   37:    // Start listening
+        1:   38:    if (listen(server_fd, 3) < 0) {
+    #####:   39:        perror("Listen failed");
+    #####:   40:        exit(EXIT_FAILURE);
+        -:   41:    }
+        -:   42:
+        1:   43:    cout << "Server is running and waiting for connections on port " << PORT << "...\n";
+        -:   44:
+        -:   45:    // Accept a connection
+        1:   46:    client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &addr_len);
+        1:   47:    if (client_fd < 0) {
+    #####:   48:        perror("Accept failed");
+    #####:   49:        exit(EXIT_FAILURE);
+        -:   50:    }
+        -:   51:
+        1:   52:    cout << "Client connected!\n";
+        -:   53:
+        -:   54:    // Read data from client
+        1:   55:    read(client_fd, buffer, BUFFER_SIZE);
+        1:   56:    cout << "Received:\n" << buffer << endl;
+        -:   57:
+        -:   58:    //first line = number of vertices
+        -:   59:    //Remaining lines: one edge per line: u v
+        2:   60:    istringstream iss(buffer); //create a stream from the received buffer
+        -:   61:    int numVertices;
+        1:   62:    iss >> numVertices; //read number of vertices
+        -:   63:
+        1:   64:    Graph g(numVertices, false); //create an undirected graph with that many vertices
+        -:   65:    int u, v;
+        5:   66:    while (iss >> u >> v) {  //read edges until input ends
+        4:   67:        g.addEdge(u, v);
+        -:   68:    }
+        -:   69:
+        -:   70:    // Process the graph
+        1:   71:    string response;
+        1:   72:    if (g.hasEulerCircuit()) {
+        1:   73:        vector<int> circuit = g.findEulerCircuit();
+        1:   74:        response = "Euler Circuit: ";
+        6:   75:        for (int node : circuit) {
+        5:   76:            response += to_string(node) + " ";
+        -:   77:        }
+        1:   78:    } else {
+    #####:   79:        response = "No Euler Circuit";
+        -:   80:    }
+        -:   81:
+        -:   82:    // Send response to client
+        1:   83:    send(client_fd, response.c_str(), response.length(), 0);
+        1:   84:    cout << "Result sent to client.\n";
+        -:   85:
+        -:   86:    // Close connection
+        1:   87:    close(client_fd);
+        1:   88:    close(server_fd);
+        -:   89:
+        1:   90:    return 0;
+        1:   91:}

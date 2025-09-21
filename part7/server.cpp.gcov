@@ -1,0 +1,51 @@
+        -:    0:Source:server.cpp
+        -:    0:Graph:server.gcno
+        -:    0:Data:server.gcda
+        -:    0:Runs:4
+        -:    1:#include "factory.hpp"
+        -:    2:#include "graph.hpp"
+        -:    3:#include <iostream>
+        -:    4:#include <sstream>
+        -:    5:#include <unistd.h>
+        -:    6:#include <netinet/in.h>
+        -:    7:
+        4:    8:int main() {
+        -:    9:    int server_fd, new_socket;
+        4:   10:    sockaddr_in address{};
+        4:   11:    int opt = 1, addrlen = sizeof(address);
+        -:   12:
+        4:   13:    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+        4:   14:    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+        -:   15:
+        4:   16:    address.sin_family = AF_INET;
+        4:   17:    address.sin_addr.s_addr = INADDR_ANY;
+        4:   18:    address.sin_port = htons(8080);
+        -:   19:
+        4:   20:    bind(server_fd, (struct sockaddr*)&address, sizeof(address));
+        4:   21:    listen(server_fd, 3);
+        4:   22:    std::cout << "Server listening on port 8080...\n";
+        -:   23:
+        4:   24:    new_socket = accept(server_fd, (struct sockaddr*)&address, (socklen_t*)&addrlen);
+        -:   25:
+        -:   26:    int algorithmChoice;
+        4:   27:    read(new_socket, &algorithmChoice, sizeof(int));
+        -:   28:
+        -:   29:    int vertices;
+        4:   30:    read(new_socket, &vertices, sizeof(int));
+        4:   31:    Graph g(vertices, true);
+        -:   32:
+        -:   33:    int u, v;
+        -:   34:    while (true) {
+       24:   35:        read(new_socket, &u, sizeof(int));
+       24:   36:        read(new_socket, &v, sizeof(int));
+       24:   37:        if (u == -1 && v == -1) break;
+       20:   38:        g.addEdge(u, v);
+        -:   39:    }
+        -:   40:
+        4:   41:    auto strategy = GraphAlgorithmFactory::create((AlgorithmType)algorithmChoice);
+        4:   42:    strategy->execute(g);
+        -:   43:
+        4:   44:    close(new_socket);
+        4:   45:    close(server_fd);
+        4:   46:    return 0;
+        4:   47:}

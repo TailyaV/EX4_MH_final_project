@@ -1,0 +1,113 @@
+        -:    0:Source:client.cpp
+        -:    1:#include <iostream>
+        -:    2:#include <unistd.h>
+        -:    3:#include <arpa/inet.h>
+        -:    4:#include <vector>
+        -:    5:#include <cerrno>  
+        -:    6:
+        -:    7:
+        -:    8:// Reads from 'sock' until it sees 'delim' (e.g., '\n').
+        -:    9:// Returns true if a full message was extracted; false otherwise.
+        9:   10:bool recv_until_delim(int sock, char delim, std::string& out, std::string& stash) {
+        -:   11:    char buf[1024];
+        -:   12:    while (true) {
+        -:   13:        // Look for the delimiter in the bytes we already have
+        9:   14:        size_t pos = stash.find(delim);
+        9:   15:        if (pos != std::string::npos) {
+        -:   16:            // take message up to the delimiter
+        3:   17:            out = stash.substr(0, pos); 
+        -:   18:            // remove that message + the delimiter from stash
+        3:   19:            stash.erase(0, pos + 1); 
+        3:   20:            return true; 
+        -:   21:        }
+        -:   22:
+        -:   23:        // Need more data: read from the socket (may block if socket is blocking)
+        6:   24:        ssize_t n = read(sock, buf, sizeof(buf));
+        6:   25:        if (n == 0) {
+        -:   26:            //no more bytes coming
+        1:   27:            return false;
+        -:   28:        }
+        5:   29:        if (n < 0) {
+        -:   30:            // read was interrupted by a signal; try again
+        2:   31:            if (errno == EINTR) continue;
+       1*:   32:            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        -:   33:                //no data available right now
+        1:   34:                return false;
+        -:   35:            }
+    #####:   36:            return false;
+        -:   37:        }
+        -:   38:
+        -:   39:        //Append newly read bytes to stash and loop to search for the delimiter again
+        3:   40:        stash.append(buf, buf + n);
+        4:   41:    }
+        -:   42:}
+        -:   43:
+        -:   44://Function for sending request to server
+        3:   45:bool send_request(int sock){
+        3:   46:    std::cout << "Choose Action:\n1. Send graph\n2. Random graph\nFor ending send '0'\n";
+        3:   47:    int choice; std::cin >> choice;
+        4:   48:    while (choice < 0 || choice > 2) {
+        1:   49:            std::cout << "Unknown option, choose new one:\n"; 
+        1:   50:            std::cin >> choice; 
+        -:   51:        }
+        -:   52:
+        -:   53:    //Sending request
+        3:   54:    write(sock, &choice, sizeof(choice));
+        -:   55:
+        3:   56:    if (choice == 1) { //Send graph
+        1:   57:        std::cout << "Enter number of vertices: ";
+        1:   58:        int V; std::cin >> V;
+        1:   59:        write(sock, &V, sizeof(V));
+        -:   60:
+        1:   61:        std::cout << "Enter edges (u v), -1 -1 to end:\n";
+        -:   62:        int u, v;
+        -:   63:        for (;;) {
+        3:   64:            std::cin >> u >> v;
+        3:   65:            write(sock, &u, sizeof(u));
+        3:   66:            write(sock, &v, sizeof(v));
+        3:   67:            if (u == -1 && v == -1) break;
+        -:   68:        }
+        2:   69:    } else if(choice == 2){ // choice == 2- random graph
+        1:   70:        std::cout << "Enter number of vertices: ";
+        -:   71:        int V; 
+        1:   72:        std::cin >> V; write(sock, &V, sizeof(V));
+        -:   73:
+        1:   74:        std::cout << "Enter number of edges: ";
+        -:   75:        int e; 
+        1:   76:        std::cin >> e; write(sock, &e, sizeof(e));
+        -:   77:
+        1:   78:        std::cout << "Enter seed: ";
+        -:   79:        int s; 
+        1:   80:        std::cin >> s; write(sock, &s, sizeof(s));
+        -:   81:    }else{ //coice == 0
+        1:   82:        return false;
+        -:   83:    }
+        2:   84:    return true;
+        -:   85:}
+        -:   86:
+        -:   87:#ifndef UNIT_TEST
+        -:   88:int main() {
+        -:   89:    int sock = socket(AF_INET, SOCK_STREAM, 0);
+        -:   90:    sockaddr_in serv_addr{};
+        -:   91:
+        -:   92:    serv_addr.sin_family = AF_INET;
+        -:   93:    serv_addr.sin_port = htons(8080);
+        -:   94:    inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr);
+        -:   95:
+        -:   96:    connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
+        -:   97:
+        -:   98:    std::string stash; 
+        -:   99:    while(true){
+        -:  100:        if(!send_request(sock)) break;
+        -:  101:
+        -:  102:        std::cout << "Graph sent to server.\n";
+        -:  103:        //Recive respond from server- results of all algorithms
+        -:  104:        std::string msg;
+        -:  105:        bool ok = recv_until_delim(sock, '}', msg, stash);
+        -:  106:        if (!ok) break;              // no more data
+        -:  107:        std::cout << "Algorithms results: " << msg << "\n";
+        -:  108:    }
+        -:  109:    close(sock);
+        -:  110:    return 0;
+        -:  111:}
+        -:  112:#endif

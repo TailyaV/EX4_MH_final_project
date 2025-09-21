@@ -1,0 +1,125 @@
+        -:    0:Source:server.cpp
+        -:    1:#include "lf.hpp"
+        -:    2:#include "graph.hpp"
+        -:    3:#include <iostream>
+        -:    4:#include <sstream>
+        -:    5:#include <unistd.h>
+        -:    6:#include <netinet/in.h>
+        -:    7:
+        -:    8://Function for run and print all the results of 4 algorithms
+        4:    9:static std::string run_all_algorithms(Graph& g){
+        4:   10:    std::ostringstream out;
+        -:   11:    //out << "\n{";
+        4:   12:    out << "rum all algorithm:" << std::endl;
+        4:   13:    out << "Graph adjacency list:\n";
+       18:   14:    for (int u = 0; u < g.getNumVertices(); ++u) {
+       14:   15:        out << u << ":";
+       29:   16:        for (int v : g.getNeighbors(u)) out << " " << v;
+       14:   17:        out << "\n";
+        -:   18:    }
+        4:   19:    out << "\nMST algorithm:" << std::endl;
+        4:   20:    int mw = g.mstWeight();
+        4:   21:    out << "MST weight:" << mw << std::endl;
+        4:   22:    out << "\nCOUNT CLIQUES algorithm:" << std::endl;
+        4:   23:    int c = g.countCliques();
+        4:   24:    out << "number of cliques:" << c << std::endl;
+        4:   25:    out << "\nFIND SCCs algorithm:" << std::endl;
+        4:   26:    out << "Strongly Connected Components:\n";
+        4:   27:    auto sccs = g.findSCCs();
+       13:   28:    for (const auto& component : sccs) {
+       23:   29:        for (int v : component)
+       14:   30:            out << v << " ";
+        9:   31:        out << "\n";
+        -:   32:    }
+        4:   33:    out << "\nMAX FLOW algorithm:" << std::endl;
+        4:   34:    int mf = g.maxFlow(0, g.getNumVertices() - 1);
+        4:   35:    out << "max flow:" << mf << std::endl;
+        -:   36:
+        4:   37:    out << "}";
+        8:   38:    return out.str();
+        4:   39:}
+        -:   40:
+        -:   41://Function for reading all n byts precisely
+       32:   42:static bool read_exact(int fd, void* buf, size_t n) {
+       32:   43:    char* p = (char*)buf; size_t left = n;
+       64:   44:    while (left) {
+       33:   45:        ssize_t r = ::read(fd, p, left);
+       33:   46:        if (r == 0) return false;            //close client
+      32*:   47:        if (r < 0) { if (errno == EINTR) continue; return false; }
+       32:   48:        p += r; left -= (size_t)r;
+        -:   49:    }
+       31:   50:    return true;
+        -:   51:}
+        -:   52:
+        -:   53://Function for writting all n byts precisely
+        4:   54:static bool write_all(int fd, const void* buf, size_t n) {
+        4:   55:    const char* p = static_cast<const char*>(buf);
+        4:   56:    size_t left = n;
+        8:   57:    while (left) {
+        4:   58:        ssize_t w = ::write(fd, p, left);
+       4*:   59:        if (w < 0) { if (errno == EINTR) continue; return false; }
+        4:   60:        p += w;
+        4:   61:        left -= (size_t)w;
+        -:   62:    }
+        4:   63:    return true;
+        -:   64:}
+        -:   65:
+        -:   66://Callbeck function for lf, get the client massage and sand back answer
+       10:   67:void my_handler(int new_socket) {
+        -:   68:    while(true){
+       10:   69:    int choice = -1;
+       10:   70:        if (!read_exact(new_socket, &choice, sizeof(int))) return;
+        9:   71:        if(choice == 0) break;
+        5:   72:        Graph g(0, true);
+        -:   73:
+        5:   74:        if (choice == 1) { // GRAPH
+        -:   75:            int vertices;
+       2*:   76:            if (!read_exact(new_socket, &vertices, sizeof(int))) return;
+        2:   77:            g = Graph(vertices, true);
+        -:   78:
+        -:   79:            int u, v;
+        -:   80:            while (true) {
+       7*:   81:                if (!read_exact(new_socket, &u, sizeof(int))) return;
+       7*:   82:                if (!read_exact(new_socket, &v, sizeof(int))) return;
+        7:   83:                if (u == -1 && v == -1) break;
+        5:   84:                g.addEdge(u, v);
+        -:   85:            }
+        3:   86:        } else if (choice == 2) { // RANDOM GRAPH
+        -:   87:            int vertices, edges, seed;
+       2*:   88:            if (!read_exact(new_socket, &vertices, sizeof(int))) return;
+       2*:   89:            if (!read_exact(new_socket, &edges, sizeof(int)))   return;
+       2*:   90:            if (!read_exact(new_socket, &seed, sizeof(int)))    return;
+        2:   91:            g = Graph::buildRandGraph(edges, vertices, seed);
+        -:   92:        }else {
+        1:   93:            throw std::invalid_argument("error: Unknown command");
+        -:   94:        }
+        -:   95:
+        4:   96:        std::string out = run_all_algorithms(g);
+        4:   97:        std::cout << "Sending graph algorithms results..." << std::endl;
+        -:   98:        //Send algorithms result to client 
+        4:   99:        write_all(new_socket, out.c_str(), out.size());
+        9:  100:    }
+        -:  101:}
+        -:  102:
+        -:  103:#ifndef UNIT_TEST
+        -:  104:int main() {
+        -:  105:    const int PORT = 8080;
+        -:  106:    const int THREADS = 4;
+        -:  107:
+        -:  108:    LFServer::Handler handler = my_handler;
+        -:  109:    
+        -:  110:    //Creates an instance of lf server
+        -:  111:    LFServer srv(PORT, THREADS, handler);
+        -:  112:    std::cout << "Server listening on port " << PORT
+        -:  113:              << " with " << THREADS << " threads (LF)...\n"
+        -:  114:              << "Press ENTER to stop.\n";
+        -:  115:    //Start lf server
+        -:  116:    std::thread t([&](){ srv.start(); });
+        -:  117:    std::string input; 
+        -:  118:    std::getline(std::cin, input);
+        -:  119:    srv.request_stop();
+        -:  120:    t.join();
+        -:  121:    std::cout << "Stopped.\n";
+        -:  122:    return 0;
+        -:  123:}
+        -:  124:#endif

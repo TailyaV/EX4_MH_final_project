@@ -1,0 +1,43 @@
+        -:    0:Source:client.cpp
+        -:    0:Graph:client.gcno
+        -:    0:Data:client.gcda
+        -:    0:Runs:4
+        -:    1:#include <iostream>
+        -:    2:#include <unistd.h>
+        -:    3:#include <arpa/inet.h>
+        -:    4:#include <vector>
+        -:    5:
+        4:    6:int main() {
+        4:    7:    int sock = socket(AF_INET, SOCK_STREAM, 0);
+        4:    8:    sockaddr_in serv_addr{};
+        -:    9:
+        4:   10:    serv_addr.sin_family = AF_INET;
+        4:   11:    serv_addr.sin_port = htons(8080);
+        4:   12:    inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr);
+        -:   13:
+        4:   14:    connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
+        -:   15:
+        4:   16:    std::cout << "Choose Algorithm:\n";
+        4:   17:    std::cout << "1. MST\n2. Cliques\n3. SCC\n4. Max Flow\n> ";
+        -:   18:    int choice;
+        4:   19:    std::cin >> choice;
+        4:   20:    write(sock, &choice, sizeof(int));
+        -:   21:
+        4:   22:    std::cout << "Enter number of vertices: ";
+        -:   23:    int V;
+        4:   24:    std::cin >> V;
+        4:   25:    write(sock, &V, sizeof(int));
+        -:   26:
+        4:   27:    std::cout << "Enter edges (u v), -1 -1 to end:\n";
+        -:   28:    int u, v;
+        -:   29:    while (true) {
+       24:   30:        std::cin >> u >> v;
+       24:   31:        write(sock, &u, sizeof(int));
+       24:   32:        write(sock, &v, sizeof(int));
+       24:   33:        if (u == -1 && v == -1) break;
+        -:   34:    }
+        -:   35:
+        4:   36:    std::cout << "Graph sent to server.\n";
+        4:   37:    close(sock);
+        4:   38:    return 0;
+        -:   39:}

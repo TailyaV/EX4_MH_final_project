@@ -1,0 +1,48 @@
+        -:    0:Source:main.cpp
+        -:    0:Graph:main.gcno
+        -:    0:Data:main.gcda
+        -:    0:Runs:1
+        -:    1:#include "graph.hpp"
+        -:    2:#include "strategy.hpp"
+        -:    3:#include "factory.hpp"
+        -:    4:#include <iostream>
+        -:    5:using namespace std;
+        -:    6:
+        1:    7:int main() {
+        -:    8:    int n, choice;
+        1:    9:    cout << "Enter number of vertices: ";
+        1:   10:    cin >> n;
+        1:   11:    Graph g(n, false);
+        -:   12:
+        1:   13:    cout << "Enter edges (u v), -1 -1 to end:\n";
+        -:   14:    while (true) {
+        -:   15:        int u, v;
+        7:   16:        cin >> u >> v;
+        7:   17:        if (u == -1 || v == -1) break;
+        6:   18:        g.addEdge(u, v);
+        6:   19:    }
+        -:   20:
+        -:   21:    while (true) {
+        5:   22:        cout << "\nChoose Algorithm:\n";
+        5:   23:        cout << "1. MST weight\n";
+        5:   24:        cout << "2. Count Cliques\n";
+        5:   25:        cout << "3. SCCs\n";
+        5:   26:        cout << "4. Max Flow (0 to n-1)\n";
+        5:   27:        cout << "0. Exit\n> ";
+        5:   28:        cin >> choice;
+        -:   29:
+        5:   30:        if (choice == 0) break;
+        -:   31:
+        -:   32:        //Create strategy using Factory
+        4:   33:        auto strategy = GraphAlgorithmFactory::create(static_cast<AlgorithmType>(choice));  
+       4*:   34:        if (!strategy) {
+    #####:   35:            cout << "Invalid choice.\n";
+    #####:   36:            continue;
+        -:   37:        }
+        -:   38:
+        -:   39:        //Execute strategy
+        4:   40:        strategy->execute(g);
+        8:   41:    }
+        -:   42:
+        1:   43:    return 0;
+        1:   44:}

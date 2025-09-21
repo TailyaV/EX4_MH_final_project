@@ -1,0 +1,15 @@
+        -:    0:Source:factory.cpp
+        -:    0:Graph:factory.gcno
+        -:    0:Data:factory.gcda
+        -:    0:Runs:1
+        -:    1:#include "factory.hpp"
+        -:    2:
+        4:    3:std::unique_ptr<IGraphAlgorithm> GraphAlgorithmFactory::create(AlgorithmType type) {
+        4:    4:    switch (type) {
+        1:    5:        case MST: return std::make_unique<MSTStrategy>();
+        1:    6:        case CLIQUES: return std::make_unique<CliqueStrategy>();
+        1:    7:        case SCC: return std::make_unique<SCCStrategy>();
+        1:    8:        case MAX_FLOW: return std::make_unique<MaxFlowStrategy>();
+    #####:    9:        default: return nullptr;
+        -:   10:    }
+        -:   11:}
